@@ -20,7 +20,7 @@ public:
     }
 
     // Declarators
-    void declareOption(const char shortName, const std::string &longName, bool required = false, std::string description = "")
+    bool declareOption(const char shortName, const std::string &longName, bool required = false, std::string description = "")
     {
         if (checkDeclarationPossibility(shortName, longName))
         {
@@ -28,10 +28,13 @@ public:
             mDeclaredOptionsShortsMap.emplace(shortName, param);
             mDeclaredOptionsLongsMap.emplace(longName, param);
             mDeclaredOptions.insert(param);
+            return true;
         }
+
+        return false;
     }
 
-    void declareFlag(const char shortName, const std::string &longName, bool required = false, std::string description = "")
+    bool declareFlag(const char shortName, const std::string &longName, bool required = false, std::string description = "")
     {
         if (checkDeclarationPossibility(shortName, longName))
         {
@@ -39,7 +42,10 @@ public:
             mDeclaredFlagsShortsMap.emplace(shortName, param);
             mDeclaredFlagsLongsMap.emplace(longName, param);
             mDeclaredFlags.insert(param);
+            return true;
         }
+
+        return false;
     }
 
     // Checkers
