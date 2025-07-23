@@ -1,7 +1,11 @@
+#include "src/CmdArgParser.hpp"
+
 #include <iostream>
 
-int main()
-{
-    std::cout << "CmdArgParser usage example:" << std::endl;
+int main(int argc, char** argv) {
+    CmdArgParser parser(argc, argv, "CmdArgParser Example Program");
+
+    parser.declareOption('h', "lala", false, "Desc");
+
     return 0;
 }
