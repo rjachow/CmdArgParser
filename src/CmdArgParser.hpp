@@ -15,8 +15,82 @@ public:
         : mArgc(argc), mArgv(argv), mProgramDescription(std::move(programDescription))
     {
         declareFlag('h', "help", false, "Display this help message");
+    }
 
-        parseArgs();
+    bool parseArgs()
+    {
+        std::vector<std::string> cmdArgs;
+        for (int i = 1; i < mArgc; ++i)
+        {
+            cmdArgs.push_back(mArgv[i]);
+        }
+
+        for (size_t i = 0; i < cmdArgs.size(); ++i)
+        {
+            const auto &arg = cmdArgs[i];
+            if (arg == "-h" || arg == "--help")
+            {
+                printHelp();
+                return true;
+            }
+            else if (arg.starts_with("--") && arg.size() > 2)
+            {
+            }
+            else if (arg.starts_with("-") && arg.size() > 1)
+            {
+                if (arg.size() > 2)
+                {
+                    // Many flags is bundled under one '-'
+                    for (size_t si = 1; si < arg.size(); ++si)
+                    {
+                        if (mDeclaredOptionsShortsMap.contains(arg[si]))
+                        {
+                            std::cout << "Cannot bundle options. Each option needs a separate usage. Option: " << arg[si] << " bundled in phrase: " << arg << "\n";
+                            return false;
+                        }
+
+                        if (!mDeclaredFlagsShortsMap.contains(arg[si]))
+                        {
+                            std::cout << "Unknown flag: " << arg[si] << "\n";
+                            return false;
+                        }
+
+                        mFlags.insert(mDeclaredFlagsShortsMap.at(arg[si]));
+                    }
+                }
+                else
+                {
+                    // Only one flag or option under one '-'
+                    if (mDeclaredOptionsShortsMap.contains(arg[1]))
+                    {
+                        if (i >= cmdArgs.size() - 1 || cmdArgs.at(i + 1).starts_with('-'))
+                        {
+                            std::cout << "Option: " << arg[1] << " requires a value\n";
+                            return false;
+                        }
+
+                        mOptions[mDeclaredOptionsShortsMap.at(arg[1])] = cmdArgs.at(i + 1);
+                        ++i;
+                    }
+                    else if (mDeclaredFlagsShortsMap.contains(arg[1]))
+                    {
+                        mFlags.insert(mDeclaredFlagsShortsMap.at(arg[1]));
+                    }
+                    else
+                    {
+                        std::cout << "Unknown parameter: " << arg[1] << "\n";
+                        return false;
+                    }
+                }
+            }
+            else
+            {
+                std::cout << "Unknown argument: " << arg << "\n";
+                return false;
+            }
+        }
+
+        return true;
     }
 
     // Declarators
@@ -89,75 +163,6 @@ private:
         }
 
         return true;
-    }
-
-    void parseArgs()
-    {
-        std::vector<std::string> cmdArgs;
-        for (int i = 1; i < mArgc; ++i)
-        {
-            cmdArgs.push_back(mArgv[i]);
-        }
-
-        for (size_t i = 0; i < cmdArgs.size(); ++i)
-        {
-            const auto &arg = cmdArgs[i];
-            if (arg == "-h" || arg == "--help")
-            {
-                printHelp();
-                return;
-            }
-            else if (arg.starts_with("--") && arg.size() > 2)
-            {
-            }
-            else if (arg.starts_with("-") && arg.size() > 1)
-            {
-                if (arg.size() > 2)
-                {
-                    // Many flags is bundled under one '-'
-                    for (size_t si = 1; si < arg.size(); ++si)
-                    {
-                        if (mDeclaredOptionsShortsMap.contains(arg[si]))
-                        {
-                            std::cout << "Cannot bundle options. Each option needs a separate usage. Option: " << arg[si] << " bundled in phrase: " << arg << "\n";
-                            return;
-                        }
-
-                        if (!mDeclaredFlagsShortsMap.contains(arg[si]))
-                        {
-                            std::cout << "Unknown flag: " << arg[si] << "\n";
-                            return;
-                        }
-
-                        mFlags.insert(mDeclaredFlagsShortsMap.at(arg[si]));
-                    }
-                }
-                else
-                {
-                    // Only one flag or option under one '-'
-                    if (mDeclaredOptionsShortsMap.contains(arg[1]))
-                    {
-                        if (i >= cmdArgs.size() - 1 || cmdArgs.at(i + 1).starts_with('-'))
-                        {
-                            std::cout << "Option: " << arg[1] << " requires a value\n";
-                            return;
-                        }
-
-                        mOptions[mDeclaredOptionsShortsMap.at(arg[1])] = cmdArgs.at(i + 1);
-                        ++i;
-                    }
-                    else if (mDeclaredFlagsShortsMap.contains(arg[1]))
-                    {
-                        mFlags.insert(mDeclaredFlagsShortsMap.at(arg[1]));
-                    }
-                }
-            }
-            else
-            {
-                std::cout << "Unknown argument: " << arg << "\n";
-                return;
-            }
-        }
     }
 
     void printDeclared()
