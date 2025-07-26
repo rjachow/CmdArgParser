@@ -3,9 +3,12 @@
 #include <iostream>
 
 int main(int argc, char** argv) {
-    CmdArgParser parser(argc, argv, "CmdArgParser Example Program");
+    parser::CmdArgParser parser(argc, argv, "CmdArgParser Example Program");
 
-    parser.declareFlag('h', "dddd", false, "Desc");
+    parser.declareFlag('f', "flag", false, "Desc");
+    parser.declareOption('o', "option", false, "Desc");
+
+    parser.parseArgs();
 
     return 0;
 }

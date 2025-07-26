@@ -41,28 +41,34 @@ void destroyArgv(char **argv, int argc)
     delete[] argv;
 }
 
-TEST(CmdArgParserTestSuite, FlagsAreBundled)
+TEST(CmdArgParserTestSuite, FlagsAreBundledTest)
 {
     int argc;
-    auto argv = createArgv("CmdArgParser -fgi", argc);
+    auto argv = createArgv("CmdArgParser.exe -fgi -j", argc);
 
-    CmdArgParser parser(argc, argv);
+    parser::CmdArgParser parser(argc, argv);
 
     ASSERT_TRUE(parser.declareFlag('f', "test1"));
     ASSERT_TRUE(parser.declareFlag('g', "test2"));
     ASSERT_TRUE(parser.declareFlag('i', "test3"));
+    ASSERT_TRUE(parser.declareFlag('j', "test4"));
 
     ASSERT_TRUE(parser.parseArgs());
+
+    ASSERT_TRUE(parser.hasFlag('f', "test1"));
+    ASSERT_TRUE(parser.hasFlag('g', "test2"));
+    ASSERT_TRUE(parser.hasFlag('i', "test3"));
+    ASSERT_TRUE(parser.hasFlag('j', "test4"));
 
     destroyArgv(argv, argc);
 }
 
-TEST(CmdArgParserTestSuite, FlagsAreBundledWithOption)
+TEST(CmdArgParserTestSuite, FlagsAreBundledWithOptionTest)
 {
     int argc;
-    auto argv = createArgv("CmdArgParser -fgio", argc);
+    auto argv = createArgv("CmdArgParser.exe -fgio", argc);
 
-    CmdArgParser parser(argc, argv);
+    parser::CmdArgParser parser(argc, argv);
 
     ASSERT_TRUE(parser.declareFlag('f', "test1"));
     ASSERT_TRUE(parser.declareFlag('g', "test2"));
@@ -74,12 +80,40 @@ TEST(CmdArgParserTestSuite, FlagsAreBundledWithOption)
     destroyArgv(argv, argc);
 }
 
-TEST(CmdArgParserTestSuite, UndeclaredShortParameter)
+TEST(CmdArgParserTestSuite, AlreadyUsedShortFlagTest)
 {
     int argc;
-    auto argv = createArgv("CmdArgParser -u", argc);
+    auto argv = createArgv("CmdArgParser.exe -f -f", argc);
 
-    CmdArgParser parser(argc, argv);
+    parser::CmdArgParser parser(argc, argv);
+
+    ASSERT_TRUE(parser.declareFlag('f', "test1"));
+
+    ASSERT_FALSE(parser.parseArgs());
+
+    destroyArgv(argv, argc);
+}
+
+TEST(CmdArgParserTestSuite, AlreadyUsedShortOptionTest)
+{
+    int argc;
+    auto argv = createArgv("CmdArgParser.exe -o option -o option", argc);
+
+    parser::CmdArgParser parser(argc, argv);
+
+    ASSERT_TRUE(parser.declareFlag('o', "test1"));
+
+    ASSERT_FALSE(parser.parseArgs());
+
+    destroyArgv(argv, argc);
+}
+
+TEST(CmdArgParserTestSuite, UndeclaredShortParameterTest)
+{
+    int argc;
+    auto argv = createArgv("CmdArgParser.exe -u", argc);
+
+    parser::CmdArgParser parser(argc, argv);
 
     ASSERT_TRUE(parser.declareFlag('f', "test1"));
     ASSERT_TRUE(parser.declareFlag('g', "test2"));
@@ -90,36 +124,36 @@ TEST(CmdArgParserTestSuite, UndeclaredShortParameter)
     destroyArgv(argv, argc);
 }
 
-TEST(CmdArgParserTestSuite, UnknownArgumentNoDash)
+TEST(CmdArgParserTestSuite, UnknownArgumentNoDashTest)
 {
     int argc;
-    auto argv = createArgv("CmdArgParser argument", argc);
+    auto argv = createArgv("CmdArgParser.exe argument", argc);
 
-    CmdArgParser parser(argc, argv);
+    parser::CmdArgParser parser(argc, argv);
 
     ASSERT_FALSE(parser.parseArgs());
 
     destroyArgv(argv, argc);
 }
 
-TEST(CmdArgParserTestSuite, UnknownArgumentSingleDash)
+TEST(CmdArgParserTestSuite, UnknownArgumentSingleDashTest)
 {
     int argc;
-    auto argv = createArgv("CmdArgParser -", argc);
+    auto argv = createArgv("CmdArgParser.exe -", argc);
 
-    CmdArgParser parser(argc, argv);
+    parser::CmdArgParser parser(argc, argv);
 
     ASSERT_FALSE(parser.parseArgs());
 
     destroyArgv(argv, argc);
 }
 
-TEST(CmdArgParserTestSuite, UnknownArgumentDoubleDash)
+TEST(CmdArgParserTestSuite, UnknownArgumentDoubleDashTest)
 {
     int argc;
-    auto argv = createArgv("CmdArgParser --", argc);
+    auto argv = createArgv("CmdArgParser.exe --", argc);
 
-    CmdArgParser parser(argc, argv);
+    parser::CmdArgParser parser(argc, argv);
 
     ASSERT_FALSE(parser.parseArgs());
 
@@ -129,9 +163,9 @@ TEST(CmdArgParserTestSuite, UnknownArgumentDoubleDash)
 TEST(CmdArgParserTestSuite, DeclarationDuplicationTest)
 {
     int argc;
-    auto argv = createArgv("CmdArgParser -h", argc);
+    auto argv = createArgv("CmdArgParser.exe -h", argc);
 
-    CmdArgParser parser(argc, argv);
+    parser::CmdArgParser parser(argc, argv);
 
     ASSERT_FALSE(parser.declareFlag('h', "test1"));
     ASSERT_FALSE(parser.declareFlag('t', "help"));

@@ -8,15 +8,64 @@
 #include <iostream>
 #include <vector>
 
+namespace parser
+{
+struct Parameter
+{
+    char shortName;
+    std::string longName;
+    bool required;
+    std::string description;
+
+    Parameter(char shortName, const std::string &longName, bool required = false, const std::string &description = "")
+        : shortName(shortName), longName(longName), required(required), description(description) {}
+    Parameter(const Parameter &other) = default;
+
+    bool operator==(const Parameter &other) const
+    {
+        return shortName == other.shortName && longName == other.longName;
+    }
+
+    bool operator==(const char c) const
+    {
+        return shortName == c;
+    }
+
+    bool operator==(const std::string &s) const
+    {
+        return longName == s;
+    }
+
+    struct Hash
+    {
+        std::size_t operator()(const Parameter &param) const
+        {
+            return std::hash<char>()(param.shortName) ^ std::hash<std::string>()(param.longName);
+        }
+    };
+};
+
+std::ostream &operator<<(std::ostream &stream, const Parameter &param)
+{
+    stream << "  -" << param.shortName << ", --" << param.longName;
+    if (!param.description.empty())
+    {
+        std::cout << " : " << param.description;
+    }
+    return stream;
+}
+
 class CmdArgParser
 {
 public:
+    // Constructors
     CmdArgParser(int argc, char **argv, std::string programDescription = "")
         : mArgc(argc), mArgv(argv), mProgramDescription(std::move(programDescription))
     {
         declareFlag('h', "help", false, "Display this help message");
     }
 
+    // Parsers
     bool parseArgs()
     {
         std::vector<std::string> cmdArgs;
@@ -35,6 +84,42 @@ public:
             }
             else if (arg.starts_with("--") && arg.size() > 2)
             {
+                const auto longName = arg.substr(2);
+
+                if (mDeclaredOptionsLongsMap.contains(longName))
+                {
+                    if (i >= cmdArgs.size() - 1 || cmdArgs.at(i + 1).starts_with('-'))
+                    {
+                        reportError("Option: ", longName, " requires a value");
+                        return false;
+                    }
+
+                    const auto &param = mDeclaredFlagsLongsMap.at(longName);
+                    if (mOptions.contains(param))
+                    {
+                        reportError("Option: ", param, " already used");
+                        return false;
+                    }
+
+                    mOptions[mDeclaredOptionsLongsMap.at(longName)] = cmdArgs.at(i + 1);
+                    ++i;
+                }
+                else if (mDeclaredFlagsLongsMap.contains(longName))
+                {
+                    const auto &param = mDeclaredFlagsLongsMap.at(longName);
+                    if (mFlags.contains(param))
+                    {
+                        reportError("Flag: ", param, " already used");
+                        return false;
+                    }
+
+                    mFlags.insert(param);
+                }
+                else
+                {
+                    reportError("Undeclared parameter: ", longName);
+                    return false;
+                }
             }
             else if (arg.starts_with("-") && arg.size() > 1)
             {
@@ -45,17 +130,24 @@ public:
                     {
                         if (mDeclaredOptionsShortsMap.contains(arg[si]))
                         {
-                            std::cout << "Cannot bundle options. Each option needs a separate usage. Option: " << arg[si] << " bundled in phrase: " << arg << "\n";
+                            reportError("Cannot bundle options. Each option needs a separate usage. Option: ", arg[si], " bundled in phrase: ", arg);
                             return false;
                         }
 
                         if (!mDeclaredFlagsShortsMap.contains(arg[si]))
                         {
-                            std::cout << "Unknown flag: " << arg[si] << "\n";
+                            reportError("Undeclared flag: ", arg[si]);
                             return false;
                         }
 
-                        mFlags.insert(mDeclaredFlagsShortsMap.at(arg[si]));
+                        const auto& param = mDeclaredFlagsShortsMap.at(arg[si]);
+                        if (mFlags.contains(param))
+                        {
+                            reportError("Flag: ", param, " already used");
+                            return false;
+                        }
+
+                        mFlags.insert(param);
                     }
                 }
                 else
@@ -65,7 +157,14 @@ public:
                     {
                         if (i >= cmdArgs.size() - 1 || cmdArgs.at(i + 1).starts_with('-'))
                         {
-                            std::cout << "Option: " << arg[1] << " requires a value\n";
+                            reportError("Option: ", arg[1], " requires a value");
+                            return false;
+                        }
+
+                        const auto &param = mDeclaredOptionsShortsMap.at(arg[1]);
+                        if (mOptions.contains(param))
+                        {
+                            reportError("Option: ", param, " already used");
                             return false;
                         }
 
@@ -74,18 +173,25 @@ public:
                     }
                     else if (mDeclaredFlagsShortsMap.contains(arg[1]))
                     {
-                        mFlags.insert(mDeclaredFlagsShortsMap.at(arg[1]));
+                        const auto &param = mDeclaredFlagsShortsMap.at(arg[1]);
+                        if (mFlags.contains(param))
+                        {
+                            reportError("Flag: ", param, " already used");
+                            return false;
+                        }
+
+                        mFlags.insert(param);
                     }
                     else
                     {
-                        std::cout << "Unknown parameter: " << arg[1] << "\n";
+                        reportError("Undeclared parameter: ", arg[1]);
                         return false;
                     }
                 }
             }
             else
             {
-                std::cout << "Unknown argument: " << arg << "\n";
+                reportError("Unknown argument: ", arg);
                 return false;
             }
         }
@@ -138,7 +244,7 @@ public:
         return std::nullopt;
     }
 
-    bool hasFlag(char shortName, std::string longName) const
+    bool hasFlag(char shortName, const std::string& longName) const
     {
         return mFlags.contains({shortName, longName});
     }
@@ -148,16 +254,14 @@ private:
     {
         if (mDeclaredFlagsShortsMap.contains(shortName) || mDeclaredFlagsLongsMap.contains(longName))
         {
-            std::cout << "Unable to declare: -" << shortName << ", --" << longName << ". Already declared in flags.\n"
-                      << "Declared parameters:\n";
+            reportError("Unable to declare: -", shortName, " , --", longName, ". Already declared in flags");
             printDeclared();
             return false;
         }
 
         if (mDeclaredOptionsShortsMap.contains(shortName) || mDeclaredOptionsLongsMap.contains(longName))
         {
-            std::cout << "Unable to declare: -" << shortName << ", --" << longName << ". Already declared in options.\n"
-                      << "Declared parameters:\n";
+            reportError("Unable to declare: -", shortName, " , --", longName, ". Already declared in options");
             printDeclared();
             return false;
         }
@@ -167,20 +271,17 @@ private:
 
     void printDeclared()
     {
+        std::cout << "Declared parameters:\n";
         std::cout << "Options:\n";
         for (const auto &option : mDeclaredOptions)
         {
-            std::cout << "  -" << option.shortName << ", --" << option.longName;
-            if (!option.description.empty())
-            {
-                std::cout << " : " << option.description;
-            }
+            std::cout << option << "\n";
         }
 
         std::cout << "\nFlags:\n";
         for (const auto &flag : mDeclaredFlags)
         {
-            std::cout << "  -" << flag.shortName << ", --" << flag.longName << "\n";
+            std::cout << flag << "\n";
         }
     }
 
@@ -190,42 +291,19 @@ private:
         printDeclared();
     }
 
-private:
-    struct Parameter
+    void reportError()
     {
-        char shortName;
-        std::string longName;
-        bool required;
-        std::string description;
+        std::cout << std::endl;
+    }
 
-        Parameter(char shortName, const std::string &longName, bool required = false, const std::string &description = "")
-            : shortName(shortName), longName(longName), required(required), description(description) {}
-        Parameter(const Parameter &other) = default;
+    template <typename T, typename... Args>
+    void reportError(T firstArg, Args... remainingArgs)
+    {
+        std::cout << firstArg;
+        reportError(remainingArgs...);
+    }
 
-        bool operator==(const Parameter &other) const
-        {
-            return shortName == other.shortName && longName == other.longName;
-        }
-
-        bool operator==(const char c) const
-        {
-            return shortName == c;
-        }
-
-        bool operator==(const std::string &s) const
-        {
-            return longName == s;
-        }
-
-        struct Hash
-        {
-            std::size_t operator()(const Parameter &param) const
-            {
-                return std::hash<char>()(param.shortName) ^ std::hash<std::string>()(param.longName);
-            }
-        };
-    };
-
+private:
     int mArgc;
     char **mArgv;
     std::string mProgramDescription;
@@ -240,3 +318,4 @@ private:
     std::unordered_map<char, Parameter> mDeclaredFlagsShortsMap;
     std::unordered_map<std::string, Parameter> mDeclaredFlagsLongsMap;
 };
+}
