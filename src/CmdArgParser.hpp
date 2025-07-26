@@ -94,13 +94,13 @@ public:
                         return false;
                     }
 
-                    const auto &param = mDeclaredFlagsLongsMap.at(longName);
+                    const auto &param = mDeclaredOptionsLongsMap.at(longName);
                     if (mOptions.contains(param))
                     {
                         reportError("Option: ", param, " already used");
                         return false;
                     }
-
+                    
                     mOptions[mDeclaredOptionsLongsMap.at(longName)] = cmdArgs.at(i + 1);
                     ++i;
                 }
@@ -192,6 +192,24 @@ public:
             else
             {
                 reportError("Unknown argument: ", arg);
+                return false;
+            }
+        }
+
+        for (const auto& option : mDeclaredOptions)
+        {
+            if (option.required && !mOptions.contains(option))
+            {
+                reportError("Option: ", option, " is required");
+                return false;
+            }
+        }
+
+        for (const auto &flag : mDeclaredFlags)
+        {
+            if (flag.required && !mFlags.contains(flag))
+            {
+                reportError("Flag: ", flag, " is required");
                 return false;
             }
         }
